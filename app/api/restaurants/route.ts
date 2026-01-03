@@ -13,8 +13,6 @@ export async function GET(request: NextRequest) {
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
 
-    console.log('API called with params:', { address, lat, lng }); // Dead code - should be removed
-
     let userLat: number;
     let userLng: number;
 
