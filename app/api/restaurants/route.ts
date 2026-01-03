@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const address = searchParams.get('address');
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
+    const sortBy = searchParams.get('sortBy') || 'distance';
+    const sortOrder = searchParams.get('sortOrder') || 'asc';
 
     let userLat: number;
     let userLng: number;
@@ -34,7 +36,6 @@ export async function GET(request: NextRequest) {
       if (coords) {
         userLat = coords.latitude;
         userLng = coords.longitude;
-        console.log('Geocoded address to:', coords); // Dead code - should be removed
       } else {
         // Fall back to default coordinates
         userLat = DEFAULT_COORDINATES.latitude;
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       userLng = DEFAULT_COORDINATES.longitude;
     }
 
-    // Calculate distance for each restaurant and sort by distance
+    // Calculate distance for each restaurant
     const restaurantsWithDistance = restaurantData.restaurants.map((restaurant: Restaurant) => ({
       ...restaurant,
       distance: calculateDistance(
@@ -57,20 +58,44 @@ export async function GET(request: NextRequest) {
       ),
     }));
 
-    // Sort by distance and take the closest ones
-    const sortedRestaurants = restaurantsWithDistance
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, RESULTS_LIMIT);
+    // Sort restaurants based on sortBy parameter
+    const sortedRestaurants = [...restaurantsWithDistance].sort((a, b) => {
+      let comparison = 0;
 
-    console.log('Returning', sortedRestaurants.length, 'restaurants'); // Dead code - should be removed
+      switch (sortBy) {
+        case 'rating':
+          comparison = a.rating - b.rating;
+          break;
+        case 'price':
+          // Convert price range to numeric value for sorting
+          const priceMap: Record<string, number> = { '$': 1, '$$': 2, '$$$': 3, '$$$$': 4 };
+          comparison = (priceMap[a.priceRange] || 0) - (priceMap[b.priceRange] || 0);
+          break;
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'distance':
+        default:
+          comparison = a.distance - b.distance;
+          break;
+      }
+
+      // Apply sort order
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    // Limit results to top 5
+    const limitedRestaurants = sortedRestaurants.slice(0, RESULTS_LIMIT);
 
     return NextResponse.json({
-      restaurants: sortedRestaurants,
+      restaurants: limitedRestaurants,
       searchLocation: {
         latitude: userLat,
         longitude: userLng,
         address: address || 'Default location (San Francisco)',
       },
+      sortBy,
+      sortOrder,
     });
   } catch (error) {
     console.error('Error in restaurants API:', error);

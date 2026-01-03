@@ -8,21 +8,35 @@ import { Restaurant } from '@/types/restaurant';
 // TODO: Workshop Exercise 5 - Improve UI with better styling
 // Consider adding animations, better loading states, and responsive design improvements
 
+type SortBy = 'distance' | 'rating' | 'price' | 'name';
+type SortOrder = 'asc' | 'desc';
+
 export default function Home() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('distance');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-  // console.log('Home component rendered'); // Dead code - should be removed
-
-  const handleSearch = async (location: string) => {
+  const handleSearch = async (location: string, newSortBy?: SortBy, newSortOrder?: SortOrder) => {
     setLoading(true);
     setError(null);
     setHasSearched(true);
+    setCurrentLocation(location);
+
+    const currentSortBy = newSortBy || sortBy;
+    const currentSortOrder = newSortOrder || sortOrder;
 
     try {
-      const response = await fetch(`/api/restaurants?address=${encodeURIComponent(location)}`);
+      const params = new URLSearchParams({
+        address: location,
+        sortBy: currentSortBy,
+        sortOrder: currentSortOrder,
+      });
+
+      const response = await fetch(`/api/restaurants?${params.toString()}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -35,6 +49,21 @@ export default function Home() {
       setRestaurants([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSortChange = (newSortBy: SortBy) => {
+    setSortBy(newSortBy);
+    if (currentLocation) {
+      handleSearch(currentLocation, newSortBy, sortOrder);
+    }
+  };
+
+  const handleSortOrderToggle = () => {
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newOrder);
+    if (currentLocation) {
+      handleSearch(currentLocation, sortBy, newOrder);
     }
   };
 
@@ -80,9 +109,43 @@ export default function Home() {
 
           {!loading && restaurants.length > 0 && (
             <div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Found {restaurants.length} restaurants near you
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4 sm:mb-0">
+                  Found {restaurants.length} restaurants near you
+                </h2>
+
+                {/* Sorting Controls */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="sortBy" className="text-sm font-medium text-gray-700">
+                      Sort by:
+                    </label>
+                    <select
+                      id="sortBy"
+                      value={sortBy}
+                      onChange={(e) => handleSortChange(e.target.value as SortBy)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                    >
+                      <option value="distance">Distance</option>
+                      <option value="rating">Rating</option>
+                      <option value="price">Price</option>
+                      <option value="name">Name</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleSortOrderToggle}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                    title={`Sort ${sortOrder === 'asc' ? 'ascending' : 'descending'}`}
+                  >
+                    {sortOrder === 'asc' ? '↑' : '↓'}
+                    <span className="hidden sm:inline">
+                      {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               {/* TODO: Workshop Exercise 1 - Add opening hours display */}
               {/* Currently the opening hours are available in the data but not displayed */}
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
